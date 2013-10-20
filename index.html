@@ -1,0 +1,83 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    
+    <script src="headtrackr.js"></script>
+    
+    <script type="text/javascript">
+
+  
+
+    </script>
+</head>
+
+<canvas id="inputCanvas" width="320" height="240" style="display:none"></canvas>
+<video id="inputVideo" autoplay loop></video>
+<script type="text/javascript">
+  var videoInput = document.getElementById('inputVideo');
+  var canvasInput = document.getElementById('inputCanvas');
+
+  var htracker = new headtrackr.Tracker({ui : true, debug : true  });
+  htracker.init(videoInput, canvasInput);
+  htracker.start();
+
+  var x;
+  var y;
+  var width; 
+  var height;
+  
+document.addEventListener('facetrackingEvent', 
+  function (event) {
+    console.log(event.x, event.y, event.width,event.height);
+    x = event.x;
+    y= event.y;
+    width = event.width;
+    height = event.height;
+
+    // if (event.status == "getUserMedia") {
+    //   alert("getUserMedia is supported!");
+    // }
+  }
+);
+
+</script>
+<canvas width="600" height="600" id="mycanvas" />
+
+<script type="text/javascript">
+  
+  var canvas = document.getElementById('mycanvas');
+  var context = canvas.getContext('2d');
+  
+  var x = 0;
+  var y = Math.random()*canvas.width;
+  var draw = function() {
+
+      var canvas = document.getElementById('mycanvas');
+      var context = canvas.getContext('2d');
+      context.fillStyle   = '#CC5422'; // set canvas background color
+      context.fillRect  (0,   0,600, 600);  // now fill the canvas
+      console.log(x, y, width,height);
+      context.beginPath();
+      context.rect(x, y, width, height);
+      // context.fillStyle = 'yellow';
+      // context.fill();
+      context.lineWidth = 6;
+      context.strokeStyle = 'black';
+      context.stroke();
+
+
+     var videoCanvas = document.getElementById("inputCanvas");
+     var videoCtx = videoCanvas.getContext('2d');
+     var frame =  videoCtx.getImageData(  x, y,width,height);
+     context.putImageData(frame,x,y);
+
+  };
+        
+  setInterval(draw,1000/30); // 30 x per second
+  
+</script>
+    
+  </body>
+</body>
+</html>
+
