@@ -3,17 +3,92 @@
     <meta charset="utf-8">
     
     <script src="headtrackr.js"></script>
-    
+    <script src="http://cdn.peerjs.com/0.3/peer.min.js"></script>
+    <script src="socket.io/socket.io.js"> </script>
     <script type="text/javascript">
+      /* Get User Media */
+      var my_stream = null;
 
+      window.URL = window.URL || window.webkitURL || window.mozURL || window.msURL;
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+      if (navigator.getUserMedia) {
+        navigator.getUserMedia({video: true, audio: true}, function(stream) {
+              my_stream = stream;
+              var videoElement = document.getElementById('myvideo');
+              videoElement.src = window.URL.createObjectURL(stream) || stream;
+              videoElement.play();
+            }, function(err) {
+              console.log('Failed to get local stream' ,err);
+        });
+      }   
+        
+
+      // We'll use a global variable to hold on to our id from PeerJS
+      var peer_id = null;
+
+      // Register for an API Key: http://peerjs.com/peerserver
+      var peer = new Peer({key: 'c9tm16hc72t0ggb9'});
+
+      // Get an ID from the PeerJS server   
+      peer.on('open', function(id) {
+        console.log('My peer ID is: ' + id);
+        peer_id = id;
+        socket.emit("peer_id",peer_id);
+      }); 
   
+      peer.on('call', function(incoming_call) {
+        console.log("Got a call!");
+        incoming_call.answer(my_stream); // Answer the call with our stream from getUserMedia
+        incoming_call.on('stream', function(remoteStream) {  // we receive a getUserMedia stream from the remote caller
+          // And attach it to a video object
+          var ovideoElement = document.getElementById('othervideo');
+          ovideoElement.src = window.URL.createObjectURL(remoteStream) || remoteStream;
+          ovideoElement.play();
+        });
+      });  
 
+      /* Socket Server - Socket.io */
+      var socket = io.connect('http://localhost:8080/');
+
+      // When we connect, assuming we have a peer_id, send it out
+      socket.on('connect', function() {
+        console.log("Connected");
+
+        // When we connect, if we have a peer_id, send it out 
+        if (peer_id != null) {
+          console.log("peer id is not null, sending it");
+          socket.emit("peer_id",peer_id);
+        }
+        else{
+          console.log(peer_id); 
+        }
+      });
+
+      // Receive other folks peer_ids
+      socket.on('peer_id', function (data) {
+        console.log("Got a new peer: " + data);
+
+        
+        // Call them with our stream, my_stream
+        console.log("Calling peer: " + data);           
+        var call = peer.call(data, my_stream);
+        
+        // After they answer, we'll get a 'stream' event with their stream  
+        call.on('stream', function(remoteStream) {
+          console.log("Got remote stream");
+          document.getElementById('myvideo').src = window.URL.createObjectURL(remoteStream) || remoteStream;
+        });
+      });          
+  
     </script>
 </head>
 
 <canvas id="inputCanvas" width="320" height="240" style="display:none"></canvas>
 <video id="inputVideo" autoplay loop></video>
+<video id="myvideo" width="320" height="240"></video>
 <script type="text/javascript">
+
+//init headtracker adn callback for faceTracking event
   var videoInput = document.getElementById('inputVideo');
   var canvasInput = document.getElementById('inputCanvas');
 
@@ -27,16 +102,11 @@
   var height;
   
 document.addEventListener('facetrackingEvent', 
-  function (event) {
-    console.log(event.x, event.y, event.width,event.height);
+  function (event) {            
     x = event.x;
     y= event.y;
     width = event.width;
     height = event.height;
-
-    // if (event.status == "getUserMedia") {
-    //   alert("getUserMedia is supported!");
-    // }
   }
 );
 
@@ -54,22 +124,20 @@ document.addEventListener('facetrackingEvent',
 
       var canvas = document.getElementById('mycanvas');
       var context = canvas.getContext('2d');
-      context.fillStyle   = '#CC5422'; // set canvas background color
+      context.fillStyle   = '##E8E7E7'; // set canvas background color
       context.fillRect  (0,   0,600, 600);  // now fill the canvas
-      console.log(x, y, width,height);
       context.beginPath();
       context.rect(x, y, width, height);
-      // context.fillStyle = 'yellow';
-      // context.fill();
-      context.lineWidth = 6;
+      context.lineWidth = 4;
       context.strokeStyle = 'black';
       context.stroke();
 
 
      var videoCanvas = document.getElementById("inputCanvas");
      var videoCtx = videoCanvas.getContext('2d');
-     var frame =  videoCtx.getImageData(  x, y,width,height);
-     context.putImageData(frame,x,y);
+     var frame =  videoCtx.getImageData(  x-width/2, y-height/2,width,height);
+     // context.putImageData(frame,x - width/2,y -  height/2);
+     context.putImageData(frame,0,0);
 
   };
         
