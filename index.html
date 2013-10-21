@@ -33,6 +33,7 @@
       peer.on('open', function(id) {
         console.log('My peer ID is: ' + id);
         peer_id = id;
+        console.log('emitting: ' + id);
         socket.emit("peer_id",peer_id);
       }); 
   
@@ -46,9 +47,27 @@
           ovideoElement.play();
         });
       });  
+//
+      peer.on('connection', function(incoming_data) {
+        console.log("Got a data connection!");
+        console.log(incoming_data);
+        
+        incoming_data.on('data',function(data){
+          console.log(data['facetrackingEvent'][0].x);        
+        var videoCanvas = document.getElementById("inputCanvas");
+        var videoCtx = videoCanvas.getContext('2d');
+        var frame =  videoCtx.getImageData(  data['facetrackingEvent'][0].x-data['facetrackingEvent'][0].width/2, data['facetrackingEvent'][0].y-data['facetrackingEvent'][0].height/2,data['facetrackingEvent'][0].width,data['facetrackingEvent'][0].height);
+        context.putImageData(frame,500,500);          
+        });
 
+        incoming_data.on('error',function(err){
+          console.log(err);        
+        });
+
+      });  
+//
       /* Socket Server - Socket.io */
-      var socket = io.connect('http://localhost:8080/');
+      var socket = io.connect('http://ec2-54-200-21-15.us-west-2.compute.amazonaws.com:8080/');
 
       // When we connect, assuming we have a peer_id, send it out
       socket.on('connect', function() {
@@ -64,19 +83,31 @@
         }
       });
 
+      var dataConn;
       // Receive other folks peer_ids
-      socket.on('peer_id', function (data) {
-        console.log("Got a new peer: " + data);
+      socket.on('peer_id', function (peer_ids) {
+        console.log("Got a new peer: " + peer_ids);
 
         
         // Call them with our stream, my_stream
-        console.log("Calling peer: " + data);           
-        var call = peer.call(data, my_stream);
+        console.log("Calling peer: " + peer_ids);           
+        var call = peer.call(peer_ids, my_stream);
         
+        // Call them with our stream, my_stream
+        console.log("Establishing data connection with user: " + peer_ids);           
+        dataConn = peer.connect(peer_ids);
+
+        dataConn.on('open',function(data){
+        
+          console.log('Received', data);
+          conn.send('Hello!');
+
+        });
+
         // After they answer, we'll get a 'stream' event with their stream  
         call.on('stream', function(remoteStream) {
-          console.log("Got remote stream");
-          document.getElementById('myvideo').src = window.URL.createObjectURL(remoteStream) || remoteStream;
+          console.log("Got remote x stream");
+          document.getElementById('othervideo').src = window.URL.createObjectURL(remoteStream) || remoteStream;
         });
       });          
   
@@ -86,6 +117,7 @@
 <canvas id="inputCanvas" width="320" height="240" style="display:none"></canvas>
 <video id="inputVideo" autoplay loop></video>
 <video id="myvideo" width="320" height="240"></video>
+<video id="othervideo" width="320" height="240"></video>
 <script type="text/javascript">
 
 //init headtracker adn callback for faceTracking event
@@ -107,8 +139,21 @@ document.addEventListener('facetrackingEvent',
     y= event.y;
     width = event.width;
     height = event.height;
-  }
-);
+
+    var eventData = {"facetrackingEvent": [
+        {"x": x, "y": y, "width": width, "height" : height}
+    ]}; 
+    
+    if( peer != null  &&dataConn != null){
+      if(dataConn.open){
+      console.log(peer.connections);
+      dataConn.send(eventData);
+      // dataConn.send("hello");          
+      }
+
+    }
+});
+
 
 </script>
 <canvas width="600" height="600" id="mycanvas" />
@@ -118,8 +163,8 @@ document.addEventListener('facetrackingEvent',
   var canvas = document.getElementById('mycanvas');
   var context = canvas.getContext('2d');
   
-  var x = 0;
-  var y = Math.random()*canvas.width;
+  // var rectX = 0;
+  // var rectY = Math.random()*canvas.width;
   var draw = function() {
 
       var canvas = document.getElementById('mycanvas');
@@ -135,9 +180,14 @@ document.addEventListener('facetrackingEvent',
 
      var videoCanvas = document.getElementById("inputCanvas");
      var videoCtx = videoCanvas.getContext('2d');
+     if(videoCtx != null){
      var frame =  videoCtx.getImageData(  x-width/2, y-height/2,width,height);
      // context.putImageData(frame,x - width/2,y -  height/2);
-     context.putImageData(frame,0,0);
+     
+      context.putImageData(frame,0,0); 
+     }
+     
+     
 
   };
         
